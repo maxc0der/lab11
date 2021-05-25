@@ -1,41 +1,182 @@
-# Лабораторная работа №5
+# Лабораторная работа № 1
 
-## Задание 1
-Реализовать некопируемый перемещаемый шаблон класса **stack** с методами `pop`, `push`, `head`. 
-```cpp
-template <typename T>
-class Stack
+| branch | status |
+|--------|--------|
+| nemaster    |[![Build Status](https://travis-ci.org/MIX-1/lab01-parser-dda.svg?branch=nemaster)](https://travis-ci.org/github/MIX-1/lab01-parser-dda)|
+
+## Задание
+
+Реализовать утилиту табличного вывода массива данных, хранящихся в файле формата **JSON**.<br />
+
+В качестве аргумента утилите передается путь в к файлу, который в ключе `items`<br />
+содержит массив объектов, каждый объект из которых имеет следующие ключи:<br />
+`name` - фамилия и имя студента (строчный тип)<br />
+`group` - номер группы (строчный/целочисленный тип)<br />
+`avg` - средний балл (строчный/целочисленный/вещественный тип)<br />
+`debt` - список задолженностей (строчный/перечислительный тип)<br />
+
+## Иллюстрация
+
+Рассмотрим на примере **students.json** файл содержащий описание 3 студентов.
+
+```json
 {
-public:
-  void push(T&& value);
-  void push(const T& value);
-  void pop();
-  const T& head() const;
-};
+  "items": [
+    {
+      "name": "Ivanov Petr",
+      "group": "1",
+      "avg": "4.25",
+      "debt": null
+    },
+    {
+      "name": "Sidorov Ivan",
+      "group": 31,
+      "avg": 4,
+      "debt": "C++"
+    },
+    {
+      "name": "Pertov Nikita",
+      "group": "IU8-31",
+      "avg": 3.33,
+      "debt": [
+        "C++",
+        "Linux",
+        "Network"
+      ]
+    }
+  ],
+  "_meta": {
+    "count": 3
+  }
+}
 ```
-⚠️ *Стандартными контейнерами пользоваться **запрещено**.*
 
-## Задание 2
-Реализовать некопируемый перемещаемый шаблон класса `Stack` для некопируемых перемещаемых типов с методами:
-* `push_emplace`, принимающего те же аргументы, что и конструктор для `T`, где `T` - пареметр шаблона;
-* `head`, возвращающего ссылку на верхушку стека;
-* `pop`, выполняющего снятие элемента с верхушки стека.
+И иллюстрацию того, что должна вывести программа после обработки данного файла.
+```sh
+# ./parser students.json
+
+| name          | group  | avg  | debt          |
+|---------------|--------|------|---------------|
+| Ivanov Petr   | 1      | 4.25 | null          |
+|---------------|--------|------|---------------|
+| Sidorov Ivan  | 31     | 4.00 | C++           |
+|---------------|--------|------|---------------|
+| Pertov Nikita | IU8-31 | 3.33 | 3 items       |
+|---------------|--------|------|---------------|
+```
+
+## Требования
+
+При разработке утилиты `parser` необходимо учесть следующие моменты:
+
+- Реализовать проверку входных данных:
+  * наличия аргумента, содержащего путь к файлу
+  * существования файла
+  * `items is array`
+  * `_meta.count == len(items)`
+- Вывод ошибок должен быть информативным
+- При написание тестов учесть сценарии с различными типами для полей (`group`, `avg`, `debt`)
+
+## Подсказки
+
+Для парсинга **JSON** файла стоит воспользоваться библиотекой `nlohmann_json`,
+подключив ее через пакетный менеджер **Hunter**.
+
 ```cpp
-template <typename T>
-class Stack
-{
-public:
-  template <typename ... Args>
-  void push_emplace(Args&&... value);
-  void push(T&& value);
-  const T& head() const;
-  T pop();
-};
+// include/student.hpp
+
+struct Student {
+    std::string name;
+    std::any group;
+    std::any avg;
+    std::any debt;
+}
 ```
-⚠️ *Стандартными контейнерами пользоваться **запрещено**.*
 
-## Задание 3
-Реализовать **unit-test**'ы с использованием фреймворка **Google Test** для реализованных шаблонов в заданиях 1 и 2.
+```cpp
+// sources/student.cpp
 
-## Рекомендации
-💡 Воспользуйтесть [**type traits**](https://en.cppreference.com/w/cpp/types#Type_traits_.28since_C.2B.2B11.29), а именно `is_move_constructible`, `is_move_assignable` и пр.
+using nlohmann::json;
+
+void from_json(const json& j, student_t& s) {
+
+    s.name = get_name(j.at("group"));
+    s.group = get_group(j.at("group"));
+    s.avg = get_avg(j.at("avg"));
+    s.debt = get_group(j.at("debt"));
+}
+
+auto get_name(const json& j) -> std::string {
+    return j.get<std::string>();
+}
+
+auto get_debt(const json& j) -> std::any {
+    if (j.is_null())
+        return nullptr;
+    else if (j.is_string())
+        return j.get<std::string>();
+    else
+        return j.get<std::vector<std::string> >();
+}
+
+auto get_avg(const json& j) -> std::any {
+    if (j.is_null())
+        return nullptr;
+    else if (j.is_string())
+        return j.get<std::string>();
+    else if (j.is_number_float())
+        return j.get<double>();
+    else
+        return j.get<std::size_t>();
+}
+
+auto get_group(const json& j) -> std::any {
+    if (j.is_string())
+        return = j.get<std::string>();
+    else
+        return j.get<std::size_t>();
+}
+```
+
+```cpp
+// sources/main.cpp
+
+int main() {
+    //...
+    std::ifstream file{jsonPath};
+    if (!file) {
+        throw std::runtime_error{"unable to open json: " + jsonPath};
+    }
+
+    json data;
+    file >> data;
+
+    std::vector<student_t> students;
+    for (auto const& item : data.at("items")) {
+        auto student = item.get<student_t>()
+        students.push_back(student);
+    }
+    //...
+    print(students, std::cout);
+}
+
+void print(const std::vector<student_t>& students, std::ostream& os) {
+
+    //...
+    for (auto const& student : students) {
+        print(student, os);
+    }
+}
+void print(const student_t& student, std::ostream& os) {
+    //...
+    if (student.debt.type() == typeid(std::nullptr_t)) {
+        os << "null";
+    } else if (student.debt.type() == typeid(std::string)) {
+        os << std::any_cast<std::string>(student.debt);
+    } else {
+        os
+          << std::any_cast<std::vector<std::string> >(student.debt).size()
+          << " items";
+    }
+}
+```
